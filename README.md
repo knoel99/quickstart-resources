@@ -12,34 +12,66 @@ Ce projet utilise **uv** pour la gestion des dépendances avec des environnement
 ```bash
 # Pour chaque projet individuellement
 cd mcp-client-python
-sudo uv sync
+uv sync
 
 cd ../weather-server-python  
-sudo uv sync
+uv sync
 ```
 
-### Configuration
-
-#### Client MCP (OpenAI)
+Définir la clef API:
 ```bash
 cd mcp-client-python
-# Configuration
 cp .env.example .env
 # Éditer .env pour ajouter votre OPENAI_API_KEY
+```
 
-# Lancement du client
+### Exécution
+
+```bash
 uv run python client.py ../weather-server-python/weather.py
 ```
 
-#### Serveur MCP Météo
+Exemple d'exécution :
 ```bash
-cd weather-server-python
-# Configuration
-cp .env.example .env
-# Éditer .env pour ajouter votre clé API météo
+kim@ARTIK-PCA41-KNO:~/quickstart-resources$ cd mcp-client-python && uv run python client.py ../weather-server-python/weather.py
+[11/30/25 11:00:35] INFO     Processing request of type ListToolsRequest                                                                  server.py:674
 
-# Lancement du serveur
-uv run python weather.py
+Connected to server with tools: ['get_alerts', 'get_forecast']
+
+MCP Client Started!
+Type your queries or 'quit' to exit.
+
+Query: quel temps à SF
+[11/30/25 11:00:56] INFO     Processing request of type ListToolsRequest                                                                  server.py:674
+[11/30/25 11:01:05] INFO     Processing request of type CallToolRequest                                                                   server.py:674
+                    INFO     HTTP Request: GET https://api.weather.gov/points/37.7749,-122.4194 "HTTP/1.1 200 OK"                       _client.py:1740
+                    INFO     HTTP Request: GET https://api.weather.gov/gridpoints/MTR/85,105/forecast "HTTP/1.1 200 OK"                 _client.py:1740
+[DEBUG] Tool get_forecast returned: [TextContent(type='text', text='\nOvernight:\nTemperature: 47°F\nWind: 2 mph N\nForecast: Mostly cloudy, with a low around 47. North wind around 2 mph.\n\n---\n\nSunday:\nTemperature: 55°F\nWind: 2 to 6 mph NNE\nForecast: Mostly sunny. High near 55, with temperatures falling to around 53 in the afternoon. North northeast wind 2 to 6 mph.\n\n---\n\nSunday Night:\nTemperature: 46°F\nWind: 5 mph N\nForecast: Partly cloudy, with a low around 46. North wind around 5 mph.\n\n---\n\nMonday:\nTemperature: 61°F\nWind: 5 to 8 mph NNE\nForecast: Sunny, with a high near 61. North northeast wind 5 to 8 mph.\n\n---\n\nMonday Night:\nTemperature: 47°F\nWind: 3 to 7 mph NE\nForecast: Mostly clear, with a low around 47. Northeast wind 3 to 7 mph.\n', annotations=None, meta=None)]
+
+[Calling tool get_forecast with args {'latitude': 37.7749, 'longitude': -122.4194}]
+Result: [TextContent(type='text', text='\nOvernight:\nTemperature: 47°F\nWind: 2 mph N\nForecast: Mostly cloudy, with a low around 47. North wind around 2 mph.\n\n---\n\nSunday:\nTemperature: 55°F\nWind: 2 to 6 mph NNE\nForecast: Mostly sunny. High near 55, with temperatures falling to around 53 in the afternoon. North northeast wind 2 to 6 mph.\n\n---\n\nSunday Night:\nTemperature: 46°F\nWind: 5 mph N\nForecast: Partly cloudy, with a low around 46. North wind around 5 mph.\n\n---\n\nMonday:\nTemperature: 61°F\nWind: 5 to 8 mph NNE\nForecast: Sunny, with a high near 61. North northeast wind 5 to 8 mph.\n\n---\n\nMonday Night:\nTemperature: 47°F\nWind: 3 to 7 mph NE\nForecast: Mostly clear, with a low around 47. Northeast wind 3 to 7 mph.\n', annotations=None, meta=None)]
+Voici la météo pour San Francisco:
+
+- Cette nuit: Ciel souvent nuageux, min ~8°C (47°F), vent faible du nord.
+- Dimanche: Plutôt ensoleillé, max ~13°C (55°F) puis ~12°C (53°F) l’après-midi, vent léger NNE.
+- Dimanche soir: Partiellement nuageux, min ~8°C (46°F), vent faible du nord.
+- Lundi: Ensoleillé, max ~16°C (61°F), vent léger NNE.
+- Lundi nuit: Ciel dégagé, min ~8°C (47°F), vent faible NE.
+
+Vous préférez les températures uniquement en °C ou en °F ?
+
+Query: en celcius
+[11/30/25 11:01:39] INFO     Processing request of type ListToolsRequest                                                                  server.py:674
+
+D’accord, voici en °C:
+
+- Cette nuit: min ~8°C, ciel souvent nuageux.
+- Dimanche: max ~13°C (puis ~12°C l’après-midi), plutôt ensoleillé.
+- Dimanche soir: min ~8°C, partiellement nuageux.
+- Lundi: max ~16°C, ensoleillé.
+- Lundi nuit: min ~8°C, ciel dégagé.
+
+Query:
 ```
 
 ## Gestion de l'Environnement
@@ -51,21 +83,6 @@ Chaque projet utilise son propre environnement virtuel isolé :
 - **Environnement virtuel** : Créé automatiquement dans `.venv` dans chaque dossier de projet
 - **Nettoyage** : `rm -rf .venv` pour supprimer l'environnement du projet
 
-### Commandes utiles
-```bash
-# Depuis le dossier d'un projet
-cd mcp-client-python
-uv sync                    # Installer les dépendances
-uv run python -c "import openai; print('OpenAI OK')"  # Vérifier l'installation
-
-cd ../weather-server-python
-uv sync                    # Installer les dépendances  
-uv run python -c "import httpx; print('HTTPX OK')"  # Vérifier l'installation
-
-# Mettre à jour une dépendance
-cd mcp-client-python
-uv add openai               # Ajouter/mettre à jour openai
-```
 
 ## Structure du Projet
 
