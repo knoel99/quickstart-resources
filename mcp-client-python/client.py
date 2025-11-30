@@ -20,6 +20,7 @@ class MCPClient:
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
         self.openai = OpenAI()
+        self.conversation_history = []
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server
@@ -57,12 +58,11 @@ class MCPClient:
 
     async def process_query(self, query: str) -> str:
         """Process a query using OpenAI and available tools"""
-        messages = [
-            {
-                "role": "user",
-                "content": query
-            }
-        ]
+        # Add user query to conversation history
+        self.conversation_history.append({
+            "role": "user",
+            "content": query
+        })
 
         response = await self.session.list_tools()
         # Convert MCP tools to OpenAI function format
@@ -75,11 +75,11 @@ class MCPClient:
             }
         } for tool in response.tools]
 
-        # Initial OpenAI API call
+        # Initial OpenAI API call with full conversation history
         response = self.openai.chat.completions.create(
             model=OPENAI_MODEL,
             max_completion_tokens=1000,
-            messages=messages,
+            messages=self.conversation_history,
             tools=available_tools
         )
 
@@ -87,41 +87,54 @@ class MCPClient:
         final_text = []
         message = response.choices[0].message
 
-        # Add assistant message to conversation
-        if message.content:
-            messages.append({"role": "assistant", "content": message.content})
+        # Add assistant message to conversation history
+        assistant_msg = {
+            "role": "assistant",
+            "content": message.content
+        }
+        self.conversation_history.append(assistant_msg)
 
         if message.content:
             final_text.append(message.content)
 
         # Handle tool calls
         if message.tool_calls:
+            # Update the assistant message with tool_calls
+            assistant_msg["tool_calls"] = [{"id": tc.id, "type": tc.type, "function": {"name": tc.function.name, "arguments": tc.function.arguments}} for tc in message.tool_calls]
+            # Update the last message in history
+            self.conversation_history[-1] = assistant_msg
+
             for tool_call in message.tool_calls:
                 tool_name = tool_call.function.name
                 tool_args = eval(tool_call.function.arguments)  # Parse JSON arguments
                 
                 # Execute tool call
                 result = await self.session.call_tool(tool_name, tool_args)
+                
+                # Debug: print the result to see what we get
+                print(f"[DEBUG] Tool {tool_name} returned: {result.content}")
+                
                 final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
+                final_text.append(f"Result: {result.content}")
 
-                # Continue conversation with tool results
-                messages.append({
+                # Add tool result to conversation history
+                self.conversation_history.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
                     "content": str(result.content)
                 })
 
-                # Get next response from OpenAI
-                response = self.openai.chat.completions.create(
-                    model=OPENAI_MODEL,
-                    max_completion_tokens=1000,
-                    messages=messages,
-                )
+            # Get next response from OpenAI with updated history
+            response = self.openai.chat.completions.create(
+                model=OPENAI_MODEL,
+                max_completion_tokens=1000,
+                messages=self.conversation_history,
+            )
 
-                next_message = response.choices[0].message
-                if next_message.content:
-                    messages.append({"role": "assistant", "content": next_message.content})
-                    final_text.append(next_message.content)
+            next_message = response.choices[0].message
+            if next_message.content:
+                self.conversation_history.append({"role": "assistant", "content": next_message.content})
+                final_text.append(next_message.content)
 
         return "\n".join(final_text)
 
