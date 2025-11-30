@@ -1,0 +1,43 @@
+{ "personne":[
+{
+  "name": "Ousmane",
+  "age": 12
+},
+{
+  "name": "Alexis",
+  "age": 27
+},
+{
+  "name": "Feliks",
+  "age": 18
+},
+{
+  "name": "Joachim",
+  "age": 32
+},
+{
+  "name": "Olivier",
+  "age": 86
+},
+{
+  "name": "François",
+  "age": 77
+},
+{
+  "name": "Thomas",
+  "age": 17
+},
+{
+  "name": "Vivien",
+  "age": 26
+},
+{
+  "name": "Franck",
+  "age": 57
+},
+{
+  "name": "Jean",
+  "age": 6
+}
+]}
+
