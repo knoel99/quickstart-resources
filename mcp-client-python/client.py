@@ -5,21 +5,21 @@ from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from anthropic import Anthropic
+from openai import OpenAI
 from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv()  # load environment variables from .env
 
-# Claude model constant
-ANTHROPIC_MODEL = "claude-sonnet-4-5"
+# OpenAI model constant
+OPENAI_MODEL = "gpt-5"
 
 class MCPClient:
     def __init__(self):
         # Initialize session and client objects
         self.session: Optional[ClientSession] = None
         self.exit_stack = AsyncExitStack()
-        self.anthropic = Anthropic()
+        self.openai = OpenAI()
 
     async def connect_to_server(self, server_script_path: str):
         """Connect to an MCP server
@@ -56,7 +56,7 @@ class MCPClient:
         print("\nConnected to server with tools:", [tool.name for tool in tools])
 
     async def process_query(self, query: str) -> str:
-        """Process a query using Claude and available tools"""
+        """Process a query using OpenAI and available tools"""
         messages = [
             {
                 "role": "user",
@@ -65,53 +65,63 @@ class MCPClient:
         ]
 
         response = await self.session.list_tools()
+        # Convert MCP tools to OpenAI function format
         available_tools = [{ 
-            "name": tool.name,
-            "description": tool.description,
-            "input_schema": tool.inputSchema
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.inputSchema
+            }
         } for tool in response.tools]
 
-        # Initial Claude API call
-        response = self.anthropic.messages.create(
-            model=ANTHROPIC_MODEL,
-            max_tokens=1000,
+        # Initial OpenAI API call
+        response = self.openai.chat.completions.create(
+            model=OPENAI_MODEL,
+            max_completion_tokens=1000,
             messages=messages,
             tools=available_tools
         )
 
         # Process response and handle tool calls
         final_text = []
+        message = response.choices[0].message
 
-        for content in response.content:
-            if content.type == 'text':
-                final_text.append(content.text)
-            elif content.type == 'tool_use':
-                tool_name = content.name
-                tool_args = content.input
+        # Add assistant message to conversation
+        if message.content:
+            messages.append({"role": "assistant", "content": message.content})
+
+        if message.content:
+            final_text.append(message.content)
+
+        # Handle tool calls
+        if message.tool_calls:
+            for tool_call in message.tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = eval(tool_call.function.arguments)  # Parse JSON arguments
                 
                 # Execute tool call
                 result = await self.session.call_tool(tool_name, tool_args)
                 final_text.append(f"[Calling tool {tool_name} with args {tool_args}]")
 
                 # Continue conversation with tool results
-                if hasattr(content, 'text') and content.text:
-                    messages.append({
-                      "role": "assistant",
-                      "content": content.text
-                    })
                 messages.append({
-                    "role": "user", 
-                    "content": result.content
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": str(result.content)
                 })
 
-                # Get next response from Claude
-                response = self.anthropic.messages.create(
-                    model=ANTHROPIC_MODEL,
-                    max_tokens=1000,
+                # Get next response from OpenAI
+                response = self.openai.chat.completions.create(
+                    model=OPENAI_MODEL,
+                    max_completion_tokens=1000,
                     messages=messages,
                 )
 
-                final_text.append(response.content[0].text)
+                next_message = response.choices[0].message
+                if next_message.content:
+                    messages.append({"role": "assistant", "content": next_message.content})
+                    final_text.append(next_message.content)
 
         return "\n".join(final_text)
 
