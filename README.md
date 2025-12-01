@@ -21,4 +21,4 @@ TODO:
 
 # Aide au code
 
-Vous pouvez utiliser Cline dans VS Code et le modèle `grok-code-fast-1` qui est entièrement gratuit pour parler interagir avec votre code (https://cline.ghost.io/content/images/2025/08/image-35.png)
+Vous pouvez utiliser Cline dans VS Code et le modèle `grok-code-fast-1` qui est entièrement gratuit pour parler et interagir avec votre code (https://cline.ghost.io/content/images/2025/08/image-35.png)
