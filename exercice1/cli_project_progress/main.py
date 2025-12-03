@@ -6,6 +6,8 @@ from contextlib import AsyncExitStack
 
 from mcp_client import MCPClient
 from core.claude import Claude
+from core.tools import ToolManager
+from core.weather import get_alerts, get_forecast
 
 from core.cli_chat import CliChat
 from core.cli import CliApp
@@ -24,6 +26,43 @@ assert anthropic_api_key, (
 
 
 async def main():
+    # Register native weather tools
+    ToolManager.register_native_tool(
+        name="get_alerts",
+        description="Get weather alerts for a US state. Args: state (str): Two-letter US state code (e.g. CA, NY)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "description": "Two-letter US state code (e.g. CA, NY)"
+                }
+            },
+            "required": ["state"]
+        },
+        func=get_alerts
+    )
+    
+    ToolManager.register_native_tool(
+        name="get_forecast",
+        description="Get weather forecast for a location. Args: latitude (float), longitude (float)",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number",
+                    "description": "Latitude of the location"
+                },
+                "longitude": {
+                    "type": "number",
+                    "description": "Longitude of the location"
+                }
+            },
+            "required": ["latitude", "longitude"]
+        },
+        func=get_forecast
+    )
+    
     claude_service = Claude(model=claude_model)
 
     server_scripts = sys.argv[1:]

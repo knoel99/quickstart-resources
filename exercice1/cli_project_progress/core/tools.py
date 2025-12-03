@@ -1,15 +1,33 @@
 import json
-from typing import Optional, Literal, List
+from typing import Optional, Literal, List, Dict, Callable, Any
 from mcp.types import CallToolResult, Tool, TextContent
 from mcp_client import MCPClient
 from anthropic.types import Message, ToolResultBlockParam
 
 
 class ToolManager:
+    # Registry for native tools
+    _native_tools: Dict[str, Callable] = {}
+    
+    @classmethod
+    def register_native_tool(cls, name: str, description: str, input_schema: Dict[str, Any], func: Callable):
+        """Register a native tool function."""
+        cls._native_tools[name] = {
+            'func': func,
+            'description': description,
+            'input_schema': input_schema
+        }
+    
+    @classmethod
+    def get_native_tools(cls) -> Dict[str, Callable]:
+        """Get all registered native tools."""
+        return cls._native_tools
     @classmethod
     async def get_all_tools(cls, clients: dict[str, MCPClient]) -> list[Tool]:
-        """Gets all tools from the provided clients."""
+        """Gets all tools from the provided clients and native tools."""
         tools = []
+        
+        # Add MCP tools
         for client in clients.values():
             tool_models = await client.list_tools()
             tools += [
@@ -20,6 +38,15 @@ class ToolManager:
                 }
                 for t in tool_models
             ]
+        
+        # Add native tools
+        for name, tool_info in cls._native_tools.items():
+            tools.append({
+                "name": name,
+                "description": tool_info["description"],
+                "input_schema": tool_info["input_schema"],
+            })
+        
         return tools
 
     @classmethod
@@ -53,7 +80,7 @@ class ToolManager:
     async def execute_tool_requests(
         cls, clients: dict[str, MCPClient], message: Message
     ) -> List[ToolResultBlockParam]:
-        """Executes a list of tool requests against the provided clients."""
+        """Executes a list of tool requests against the provided clients or native tools."""
         tool_requests = [
             block for block in message.content if block.type == "tool_use"
         ]
@@ -63,6 +90,29 @@ class ToolManager:
             tool_name = tool_request.name
             tool_input = tool_request.input
 
+            # Check if it's a native tool first
+            if tool_name in cls._native_tools:
+                try:
+                    tool_info = cls._native_tools[tool_name]
+                    result = await tool_info['func'](tool_input)
+                    content_json = json.dumps([result] if isinstance(result, str) else result)
+                    tool_result_part = cls._build_tool_result_part(
+                        tool_use_id,
+                        content_json,
+                        "success",
+                    )
+                except Exception as e:
+                    error_message = f"Error executing native tool '{tool_name}': {e}"
+                    print(error_message)
+                    tool_result_part = cls._build_tool_result_part(
+                        tool_use_id,
+                        json.dumps({"error": error_message}),
+                        "error",
+                    )
+                tool_result_blocks.append(tool_result_part)
+                continue
+
+            # Check MCP clients
             client = await cls._find_client_with_tool(
                 list(clients.values()), tool_name
             )

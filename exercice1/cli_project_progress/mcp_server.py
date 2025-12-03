@@ -1,6 +1,12 @@
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from mcp.server.fastmcp.prompts import base
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.tools import ToolManager
+from core.weather import WeatherAPI
 
 
 mcp = FastMCP("DocumentMCP", log_level="ERROR")
@@ -81,8 +87,66 @@ Use the 'edit_document' tool to edit the document. After the document has been r
     ]
 
 
-# TODO: Write a prompt to summarize a doc
+# Initialize tool manager and weather API
+tool_manager = ToolManager()
+weather_api = WeatherAPI()
 
+# Expose native tools as MCP tools
+@mcp.tool(
+    name="list_native_tools",
+    description="List all available native tools"
+)
+def list_native_tools():
+    """List all available native tools."""
+    return tool_manager.list_tools()
+
+@mcp.tool(
+    name="execute_native_tool",
+    description="Execute a native tool with given arguments"
+)
+def execute_native_tool(
+    tool_name: str = Field(description="Name of the tool to execute"),
+    arguments: str = Field(description="JSON string of arguments for the tool")
+):
+    """Execute a native tool with given arguments."""
+    import json
+    
+    try:
+        args = json.loads(arguments)
+        result = tool_manager.execute_tool(tool_name, args)
+        return str(result)
+    except Exception as e:
+        return f"Error executing tool {tool_name}: {str(e)}"
+
+# Weather tools
+@mcp.tool(
+    name="get_weather_alerts",
+    description="Get weather alerts for a US state"
+)
+def get_weather_alerts(
+    state: str = Field(description="Two-letter US state code (e.g. CA, NY)")
+):
+    """Get weather alerts for a US state."""
+    try:
+        result = weather_api.get_alerts(state)
+        return result
+    except Exception as e:
+        return f"Error getting weather alerts: {str(e)}"
+
+@mcp.tool(
+    name="get_weather_forecast",
+    description="Get weather forecast for a location"
+)
+def get_weather_forecast(
+    latitude: float = Field(description="Latitude of the location"),
+    longitude: float = Field(description="Longitude of the location")
+):
+    """Get weather forecast for a location."""
+    try:
+        result = weather_api.get_forecast(latitude, longitude)
+        return result
+    except Exception as e:
+        return f"Error getting weather forecast: {str(e)}"
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
