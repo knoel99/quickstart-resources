@@ -22,32 +22,54 @@ class ToolManager:
     def get_native_tools(cls) -> Dict[str, Callable]:
         """Get all registered native tools."""
         return cls._native_tools
+    
+    @classmethod
+    def list_tools(cls) -> List[str]:
+        """List all registered native tool names."""
+        return list(cls._native_tools.keys())
+    
+    @classmethod
+    async def execute_tool(cls, tool_name: str, arguments: Dict[str, Any]) -> Any:
+        """Execute a native tool with given arguments."""
+        if tool_name not in cls._native_tools:
+            raise ValueError(f"Tool '{tool_name}' not found")
+        
+        tool_info = cls._native_tools[tool_name]
+        func = tool_info['func']
+        
+        # Handle both sync and async functions
+        import asyncio
+        if asyncio.iscoroutinefunction(func):
+            return await func(arguments)
+        else:
+            return func(arguments)
     @classmethod
     async def get_all_tools(cls, clients: dict[str, MCPClient]) -> list[Tool]:
         """Gets all tools from the provided clients and native tools."""
-        tools = []
+        tools = {}
         
         # Add MCP tools
         for client in clients.values():
             tool_models = await client.list_tools()
-            tools += [
-                {
-                    "name": t.name,
-                    "description": t.description,
-                    "input_schema": t.inputSchema,
-                }
-                for t in tool_models
-            ]
+            for t in tool_models:
+                # Only add tool if name hasn't been used yet
+                if t.name not in tools:
+                    tools[t.name] = {
+                        "name": t.name,
+                        "description": t.description,
+                        "input_schema": t.inputSchema,
+                    }
         
-        # Add native tools
+        # Add native tools (only if not already added from MCP)
         for name, tool_info in cls._native_tools.items():
-            tools.append({
-                "name": name,
-                "description": tool_info["description"],
-                "input_schema": tool_info["input_schema"],
-            })
+            if name not in tools:
+                tools[name] = {
+                    "name": name,
+                    "description": tool_info["description"],
+                    "input_schema": tool_info["input_schema"],
+                }
         
-        return tools
+        return list(tools.values())
 
     @classmethod
     async def _find_client_with_tool(
